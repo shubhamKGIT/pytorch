@@ -29,6 +29,7 @@ void verify_list(TensorList tensors1, TensorList tensors2) {
 }
 
 // To go via 'fast' path, several conditions must be satisfied
+// - All tensors must be on the same device
 // - All tensors must have strided layout
 // - All tensors must be non-overlapping and dense
 // - All tensors must be on the same device
@@ -43,6 +44,10 @@ bool can_use_fast_route(TensorList tensors, Scalar scalar) {
     }
 
     if (t.layout() != at::kStrided) {
+      return false;
+    }
+
+    if (t.device() != expected_device) {
       return false;
     }
 
@@ -69,6 +74,27 @@ bool can_use_fast_route(TensorList tensors, Scalar scalar) {
   return true;
 }
 
+bool can_use_fast_route(TensorList tensors) {
+  TORCH_CHECK(tensors.size() > 0, "Tensor list must have at least one tensor.");
+  auto expected_device = tensors[0].device();
+
+   for (auto t : tensors) {
+    if (t.layout() != at::kStrided) {
+      return false;
+    }
+
+    if (!t.is_non_overlapping_and_dense()) {
+      return false;
+    }
+
+    if (t.device() != expected_device) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 bool can_use_fast_route(TensorList tensors1, TensorList tensors2) {
   auto expected_device = tensors1[0].device();
 
@@ -82,6 +108,11 @@ bool can_use_fast_route(TensorList tensors1, TensorList tensors2) {
 
     if (tensors1[i].layout() != at::kStrided || 
         tensors2[i].layout() != at::kStrided) {
+      return false;
+    }
+
+    if (tensors1[i].device() != expected_device || 
+        tensors2[i].device() != expected_device) {
       return false;
     }
 
